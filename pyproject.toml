@@ -14,6 +14,7 @@ dependencies = ["numpy", "h5py", "joblib"]
 authors = [
     { name="Derek 'Braggling' Mendez", email="dermen@slac.stanford.edu"},
     ]
+license = { text = "MIT License" }
 
 [tool.setuptools.packages.find]
 where = ["."]

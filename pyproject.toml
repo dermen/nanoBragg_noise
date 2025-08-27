@@ -9,7 +9,7 @@ classifiers = [
 description = "A command-line tool to add noise to simulated H5 data."
 readme = "README.md"
 name = "nanoBragg_noise"
-version = "1.3"
+version = "1.4"
 dependencies = ["numpy", "h5py", "joblib"]
 authors = [
     { name="Dermen Braggling", email="dermen@slac.stanford.edu" },

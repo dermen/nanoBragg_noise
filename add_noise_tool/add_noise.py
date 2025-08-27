@@ -2,6 +2,7 @@ import numpy as np
 
 
 # A simplified representation of nanoBragg add_noise
+# mostly just an AI port of add_noise
 class Deviates:
     def __init__(self, seed):
         self.rng = np.random.default_rng(seed)
@@ -13,7 +14,7 @@ class Deviates:
         return self.rng.normal(loc=0.0, scale=1.0, size=size)
 
 
-def add_noise_no_mask(
+def add_noise(
     raw_pixels,
     flicker_noise=0.0,
     calibration_noise=0.0,
@@ -87,8 +88,7 @@ def add_noise_no_mask(
         print(f"{total_photons_calibrated:.0f} photons after calibration error, max= {max_I_calibrated:.2f}")
 
     # --- Step 3: PSF (Point Spread Function) application (Placeholder) ---
-    # The C++ code calls apply_psf here.
-    #
+    # TODO
 
     # --- Step 4: Convert to ADU and add readout noise ---
     if verbose:

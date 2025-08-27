@@ -38,8 +38,8 @@ def get_args():
     parser.add_argument(
         "--nj",
         type=int,
-        default=9,
-        help="The number of parallel processes (default=8)."
+        default=10,
+        help="The number of parallel processes (default=10)."
     )
 
     args = parser.parse_args()
@@ -47,11 +47,15 @@ def get_args():
 
 
 def process_f(f, bg, args):
+
     with h5py.File(f, 'r+') as h:
-        img = h['sim_image'][()] + bg
-        noise = add_noise.add_noise_no_mask(img, calibration_noise=args.calib)
-        del h['sim_image']
-        h.create_dataset("sim_image", data=noise.astype(np.float32))
+        shots = h['sim_image'].keys()
+        for s in shots:
+            ds_name = f'sim_image/{s}'
+            img = h[ds_name][()] + bg
+            noise = add_noise.add_noise(img, calibration_noise=args.calib)
+            del h[ds_name]
+            h.create_dataset(ds_name, data=noise.astype(np.float32))
 
 
 def worker_main(fnames, args, bg, njobs, jobid):
@@ -59,17 +63,16 @@ def worker_main(fnames, args, bg, njobs, jobid):
         if i_f % njobs != jobid:
             continue
 
+        print(f"Worker {jobid} noisifying shots in file {f} ({i_f+1}/{len(fnames)})")
         process_f(f, bg, args)
-
-        print(f"Done with shot {i_f+1}/{len(fnames)}")
 
 
 def main():
     args = get_args()
     bgname = os.path.join(args.dirname, f"background_{args.run}.h5")
     bg = h5py.File(bgname, 'r')['background'][()]
-    fnames = glob.glob(f"{args.dirname}/shot_{args.run}_*h5")
-    Parallel(n_jobs=args.nj)(delayed(main)(fnames, args, bg, args.nj, j) for j in range(args.nj))
+    fnames = glob.glob(f"{args.dirname}/shots_{args.run}_*h5")
+    Parallel(n_jobs=args.nj)(delayed(worker_main)(fnames, args, bg, args.nj, j) for j in range(args.nj))
 
 
 if __name__ == "__main__":

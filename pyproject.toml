@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: MIT License"]
+    "License :: OSI Approved :: MIT License"]
 description = "A command-line tool to add noise to simulated H5 data."
 name = "nanoBragg_noise"
-version = "1.0"
+version = "1.2"
 dependencies = ["numpy", "h5py", "joblib"]
 authors = [
     { name="Dermen Braggling", email="dermen@slac.stanford.edu" },

@@ -64,6 +64,16 @@ def get_args():
         help="The quantum gain to convert photons to detector ADUs. (default=1)"
     )
 
+    # Output options
+    output_group = parser.add_argument_group("Output Options")
+    output_group.add_argument(
+        "--outdir",
+        type=str,
+        default=None,
+        help="Write noisified H5 files to this directory instead of overwriting originals. "
+             "Directory is created if it does not exist. Useful for temporary processing pipelines."
+    )
+
     args = parser.parse_args()
 
     return args
@@ -119,27 +129,44 @@ def add_noise(img, poiss_seed=8675309, gauss_seed=8675309, calib_seed=8675309,
     return img
 
 
-def process_f(f, bg, args):
+def process_f(f, bg, args, outdir=None):
 
-    with h5py.File(f, 'r+') as h:
-        shots = h['sim_image'].keys()
-        for s in shots:
-            ds_name = f'sim_image/{s}'
-            shot_num = int(s.split("_")[-1])
-            img = h[ds_name][()] + bg
-            noise = add_noise(img, calib_noise=args.calib, poiss_seed=shot_num, gauss_seed=shot_num,
-                              flicker_noise=args.flicker, readout_noise=args.readout, quantum_gain=args.gain)
-            del h[ds_name]
-            h.create_dataset(ds_name, data=noise.astype(np.float32))
+    if outdir is not None:
+        outpath = os.path.join(outdir, os.path.basename(f))
+        with h5py.File(f, 'r') as h_in, h5py.File(outpath, 'w') as h_out:
+            # Copy any non-sim_image groups/datasets
+            for key in h_in.keys():
+                if key != 'sim_image':
+                    h_in.copy(key, h_out)
+            h_out.create_group('sim_image')
+            shots = h_in['sim_image'].keys()
+            for s in shots:
+                ds_name = f'sim_image/{s}'
+                shot_num = int(s.split("_")[-1])
+                img = h_in[ds_name][()] + bg
+                noise = add_noise(img, calib_noise=args.calib, poiss_seed=shot_num, gauss_seed=shot_num,
+                                  flicker_noise=args.flicker, readout_noise=args.readout, quantum_gain=args.gain)
+                h_out.create_dataset(ds_name, data=noise.astype(np.float32))
+    else:
+        with h5py.File(f, 'r+') as h:
+            shots = h['sim_image'].keys()
+            for s in shots:
+                ds_name = f'sim_image/{s}'
+                shot_num = int(s.split("_")[-1])
+                img = h[ds_name][()] + bg
+                noise = add_noise(img, calib_noise=args.calib, poiss_seed=shot_num, gauss_seed=shot_num,
+                                  flicker_noise=args.flicker, readout_noise=args.readout, quantum_gain=args.gain)
+                del h[ds_name]
+                h.create_dataset(ds_name, data=noise.astype(np.float32))
 
 
-def worker_main(fnames, args, bg, njobs, jobid):
+def worker_main(fnames, args, bg, njobs, jobid, outdir=None):
     for i_f, f in enumerate(fnames):
         if i_f % njobs != jobid:
             continue
 
         print(f"Worker {jobid} noisifying shots in file {f} ({i_f+1}/{len(fnames)})")
-        process_f(f, bg, args)
+        process_f(f, bg, args, outdir=outdir)
 
 
 def main():
@@ -147,7 +174,19 @@ def main():
     bgname = os.path.join(args.dirname, f"background_{args.run}.h5")
     bg = h5py.File(bgname, 'r')['background'][()]
     fnames = glob.glob(f"{args.dirname}/shots_{args.run}_*h5")
-    Parallel(n_jobs=args.nj)(delayed(worker_main)(fnames, args, bg, args.nj, j) for j in range(args.nj))
+
+    outdir = args.outdir
+    if outdir is not None:
+        os.makedirs(outdir, exist_ok=True)
+        # Also copy the background, geometry, and master files to outdir
+        import shutil
+        for extra in [bgname,
+                      os.path.join(args.dirname, f"geom_run{args.run}.expt"),
+                      os.path.join(args.dirname, f"run_{args.run}_master.h5")]:
+            if os.path.exists(extra):
+                shutil.copy2(extra, outdir)
+
+    Parallel(n_jobs=args.nj)(delayed(worker_main)(fnames, args, bg, args.nj, j, outdir) for j in range(args.nj))
 
 
 if __name__ == "__main__":

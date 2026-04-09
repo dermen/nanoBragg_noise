@@ -22,3 +22,4 @@ include = ["add_noise_tool*"]
 
 [project.scripts]
 "braggaddnoise" = "add_noise_tool.main:main"
+"braggaddnoise-mpi" = "add_noise_tool.main_mpi:main"
